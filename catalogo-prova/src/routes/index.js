@@ -1,23 +1,30 @@
 import { Router } from 'express';
+import { categoriasRepository } from '../repositories/categorias.repository.prisma.js';
+import { produtosRepository } from '../repositories/produtos.repository.prisma.js';
+import { criarCategoriasService } from '../services/categorias.service.js';
+import { criarProdutosService } from '../services/produtos.service.js';
+import { criarCategoriasController } from '../controllers/categorias.controller.js';
+import { criarProdutosController } from '../controllers/produtos.controller.js';
+import { validarCategoria, validarProduto } from '../middlewares/validacao.middleware.js';
 
-// COMPOSITION ROOT + ROTAS SSR.
-// Monte a cadeia de dependências (repositório -> service -> controller) das duas
-// entidades e declare as rotas.
-//
-// Rotas que a aplicação precisa ter:
-//   GET  /                   -> redireciona para /produtos
-//   -- Categorias --
-//   GET  /categorias         -> listagem
-//   GET  /categorias/nova    -> formulário de nova categoria (declare ANTES de rotas com :id, se houver)
-//   POST /categorias         -> validar entrada e criar
-//   -- Produtos --
-//   GET  /produtos           -> listagem
-//   GET  /produtos/novo      -> formulário de novo produto
-//   POST /produtos           -> validar entrada e criar
-export function criarRotas() {
-  const router = Router();
+const router = Router();
 
-  // TODO: instanciar repositórios, services e controllers; declarar as rotas acima.
+const categoriasService = criarCategoriasService(categoriasRepository);
+const produtosService = criarProdutosService(produtosRepository, categoriasRepository);
 
-  return router;
-}
+const categoriasController = criarCategoriasController(categoriasService);
+const produtosController = criarProdutosController(produtosService, categoriasService);
+
+router.get('/', (req, res) => {
+  res.redirect('/produtos');
+});
+
+router.get('/categorias', (req, res, next) => categoriasController.listar(req, res, next));
+router.get('/categorias/nova', (req, res) => categoriasController.exibirFormulario(req, res));
+router.post('/categorias', validarCategoria, (req, res, next) => categoriasController.criar(req, res, next));
+
+router.get('/produtos', (req, res, next) => produtosController.listar(req, res, next));
+router.get('/produtos/novo', (req, res, next) => produtosController.exibirFormulario(req, res, next));
+router.post('/produtos', validarProduto(categoriasService), (req, res, next) => produtosController.criar(req, res, next));
+
+export default router;
